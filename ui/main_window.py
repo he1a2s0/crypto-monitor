@@ -10,7 +10,9 @@ from PyQt6.QtGui import QIcon, QMouseEvent
 from PyQt6.QtWidgets import (
     QApplication,
     QMainWindow,
+    QMenu,
     QScrollArea,
+    QSystemTrayIcon,
     QVBoxLayout,
     QWidget,
 )
@@ -79,10 +81,15 @@ class MainWindow(QMainWindow):
 
     def _setup_ui(self):
         """Setup the main window UI with Fluent Design components."""
-        flags = Qt.WindowType.FramelessWindowHint
+        flags = (
+            Qt.WindowType.FramelessWindowHint
+            | Qt.WindowType.Tool  # hides taskbar button and Alt+Tab entry
+        )
         if self._settings_manager.settings.always_on_top:
             flags |= Qt.WindowType.WindowStaysOnTopHint
         self.setWindowFlags(flags)
+
+        self._setup_tray()
 
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setWindowIcon(QIcon("assets/icons/crypto-monitor.png"))
@@ -316,6 +323,43 @@ class MainWindow(QMainWindow):
         self.show()
 
     def _close_app(self):
+        """Close button → minimize to tray."""
+        self.hide()
+        self._tray_toggle_action.setText(_("Show"))
+
+    def _setup_tray(self):
+        """Create the system tray icon with a context menu."""
+        self._tray = QSystemTrayIcon(QIcon("assets/icons/crypto-monitor.png"), self)
+        self._tray.setToolTip(_("Crypto Monitor"))
+
+        menu = QMenu()
+        self._tray_toggle_action = menu.addAction(_("Show"))
+        self._tray_toggle_action.triggered.connect(self._tray_toggle)
+        menu.addSeparator()
+        quit_action = menu.addAction(_("Quit"))
+        quit_action.triggered.connect(self._quit_app)
+        self._tray.setContextMenu(menu)
+
+        self._tray.activated.connect(self._on_tray_activated)
+        self._tray.show()
+
+    def _on_tray_activated(self, reason: QSystemTrayIcon.ActivationReason):
+        if reason == QSystemTrayIcon.ActivationReason.Trigger:
+            self._tray_toggle()
+
+    def _tray_toggle(self):
+        """Toggle main window between visible and hidden."""
+        if self.isVisible():
+            self.hide()
+            self._tray_toggle_action.setText(_("Show"))
+        else:
+            self.show()
+            self.raise_()
+            self.activateWindow()
+            self._tray_toggle_action.setText(_("Hide"))
+
+    def _quit_app(self):
+        """Fully quit the application."""
         visible_pos = self._auto_hide_behavior.get_visible_pos()
         pos = visible_pos if visible_pos is not None else self.pos()
         self._settings_manager.settings.window_x = pos.x()
