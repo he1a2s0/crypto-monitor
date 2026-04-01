@@ -21,6 +21,7 @@ from core.i18n import _
 from core.market_data_controller import MarketDataController
 
 # New components
+from ui.behaviors.auto_hide_behavior import AutoHideBehavior
 from ui.behaviors.window_behavior import DraggableWindowBehavior
 from ui.managers.pagination_manager import PaginationManager
 from ui.managers.view_manager import ViewManager
@@ -51,6 +52,7 @@ class MainWindow(QMainWindow):
 
         # Initialize Managers and Behaviors
         self._window_behavior = DraggableWindowBehavior(self)
+        self._auto_hide_behavior = AutoHideBehavior(self)
         self._view_manager = ViewManager(self, self._settings_manager)
 
         # Apply theme based on settings
@@ -314,7 +316,8 @@ class MainWindow(QMainWindow):
         self.show()
 
     def _close_app(self):
-        pos = self.pos()
+        visible_pos = self._auto_hide_behavior.get_visible_pos()
+        pos = visible_pos if visible_pos is not None else self.pos()
         self._settings_manager.settings.window_x = pos.x()
         self._settings_manager.settings.window_y = pos.y()
         self._settings_manager.save()
@@ -337,7 +340,9 @@ class MainWindow(QMainWindow):
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event: QMouseEvent):
-        self._window_behavior.mouse_release_event(event)
+        did_drag = self._window_behavior.mouse_release_event(event)
+        if did_drag:
+            self._auto_hide_behavior.on_drag_released()
         super().mouseReleaseEvent(event)
 
     def enterEvent(self, event):

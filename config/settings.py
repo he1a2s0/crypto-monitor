@@ -135,7 +135,7 @@ class AppSettings:
     proxy: ProxyConfig = field(default_factory=ProxyConfig)
     window_x: int = 100
     window_y: int = 100
-    always_on_top: bool = False
+    always_on_top: bool = True
     language: str = "auto"  # "auto", "en_US", "zh_CN", etc.
     price_change_basis: str = "24h_rolling"  # "24h_rolling" or "utc_0"
 
