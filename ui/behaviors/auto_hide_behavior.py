@@ -47,14 +47,14 @@ class EdgeToggleButton(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
         self._edge = edge
         self._state = self.STATE_HIDDEN
-        self._place(win_center)
+        self._place_on_edge(win_center)
 
     def set_state(self, state: str):
         if self._state != state:
             self._state = state
             self.update()
 
-    def _place(self, win_center: QPoint):
+    def _place_on_edge(self, win_center: QPoint):
         screens = QApplication.screens()
         screen = (QApplication.primaryScreen() or screens[0]).availableGeometry()
         T, L = self._THICK, self._LEN
@@ -67,6 +67,31 @@ class EdgeToggleButton(QWidget):
             x = max(screen.left(), min(win_center.x() - w // 2, screen.right() - w))
             y = screen.top() if self._edge == "top" else screen.bottom() - h + 1
         self.setGeometry(x, y, w, h)
+
+    def place_for_hidden(self, win_center: QPoint):
+        """Place button at screen edge while window is hidden."""
+        self._place_on_edge(win_center)
+
+    def place_for_visible(self, window_geom):
+        """Place button beside the visible window without overlapping it."""
+        screens = QApplication.screens()
+        screen = (QApplication.primaryScreen() or screens[0]).availableGeometry()
+        w, h = self.width(), self.height()
+
+        if self._edge == "left":
+            x = min(window_geom.right() + 2, screen.right() - w)
+            y = max(screen.top(), min(window_geom.center().y() - h // 2, screen.bottom() - h))
+        elif self._edge == "right":
+            x = max(window_geom.left() - w - 2, screen.left())
+            y = max(screen.top(), min(window_geom.center().y() - h // 2, screen.bottom() - h))
+        elif self._edge == "top":
+            x = max(screen.left(), min(window_geom.center().x() - w // 2, screen.right() - w))
+            y = min(window_geom.bottom() + 2, screen.bottom() - h)
+        else:  # bottom
+            x = max(screen.left(), min(window_geom.center().x() - w // 2, screen.right() - w))
+            y = max(window_geom.top() - h - 2, screen.top())
+
+        self.move(x, y)
 
     def _hovered(self) -> bool:
         return self.geometry().contains(QCursor.pos())
@@ -247,6 +272,7 @@ class AutoHideBehavior(QObject):
         self._is_hidden = True
         self._animate(target)
         if self._btn:
+            self._btn.place_for_hidden(self._window.frameGeometry().center())
             self._btn.set_state(EdgeToggleButton.STATE_HIDDEN)
         logger.debug(f"AutoHide: hiding toward {self._hidden_edge}")
 
@@ -262,6 +288,7 @@ class AutoHideBehavior(QObject):
             # showing via hover → orange; showing via click (pinned) → will be updated in _on_toggle_clicked
             state = EdgeToggleButton.STATE_PINNED if self._pinned else EdgeToggleButton.STATE_HOVER
             self._btn.set_state(state)
+            self._btn.place_for_visible(self._window.frameGeometry())
         logger.debug("AutoHide: showing window")
 
     def _animate(self, target: QPoint):
