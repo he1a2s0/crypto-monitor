@@ -5,7 +5,7 @@ Main application window using Fluent Design.
 import logging
 import webbrowser
 
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import QPoint, Qt, QTimer
 from PyQt6.QtGui import QIcon, QMouseEvent
 from PyQt6.QtWidgets import (
     QApplication,
@@ -24,7 +24,12 @@ from core.market_data_controller import MarketDataController
 
 # New components
 from ui.behaviors.auto_hide_behavior import AutoHideBehavior
-from ui.behaviors.window_behavior import DraggableWindowBehavior, hide_window_from_alt_tab
+from ui.behaviors.window_behavior import (
+    DraggableWindowBehavior,
+    get_screen_geometries,
+    hide_window_from_alt_tab,
+    normalize_window_position,
+)
 from ui.managers.pagination_manager import PaginationManager
 from ui.managers.view_manager import ViewManager
 from ui.settings_window import SettingsWindow
@@ -76,8 +81,10 @@ class MainWindow(QMainWindow):
         self._pagination_manager.setup_auto_scroll()
         self._market_controller.start()
 
+        self._restore_window_position()
+
         # Initial size adjustment
-        QTimer.singleShot(100, self._view_manager.adjust_window_height)
+        QTimer.singleShot(100, self._refresh_window_geometry)
 
     def _setup_ui(self):
         """Setup the main window UI with Fluent Design components."""
@@ -95,12 +102,6 @@ class MainWindow(QMainWindow):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setWindowIcon(QIcon("assets/icons/crypto-monitor.png"))
         self.setWindowTitle(_("Crypto Monitor"))
-
-        # Move to saved position
-        self.move(
-            self._settings_manager.settings.window_x,
-            self._settings_manager.settings.window_y,
-        )
 
         central = QWidget()
         theme_mode = self._settings_manager.settings.theme_mode
@@ -328,6 +329,24 @@ class MainWindow(QMainWindow):
         """Reapply native window styles after Qt rebuilds window flags."""
         QTimer.singleShot(0, lambda: hide_window_from_alt_tab(self))
 
+    def _restore_window_position(self):
+        """Restore the window inside the nearest visible screen."""
+        saved_pos = QPoint(
+            self._settings_manager.settings.window_x,
+            self._settings_manager.settings.window_y,
+        )
+        safe_pos = normalize_window_position(saved_pos, self.size(), get_screen_geometries())
+        self.move(safe_pos)
+        if safe_pos != saved_pos:
+            self._settings_manager.settings.window_x = safe_pos.x()
+            self._settings_manager.settings.window_y = safe_pos.y()
+            self._settings_manager.save()
+
+    def _refresh_window_geometry(self):
+        """Re-apply deferred geometry changes and keep the window on-screen."""
+        self._view_manager.adjust_window_height()
+        self._restore_window_position()
+
     def _close_app(self):
         """Close button → fully quit the application."""
         self._quit_app()
@@ -368,8 +387,9 @@ class MainWindow(QMainWindow):
         """Fully quit the application."""
         visible_pos = self._auto_hide_behavior.get_visible_pos()
         pos = visible_pos if visible_pos is not None else self.pos()
-        self._settings_manager.settings.window_x = pos.x()
-        self._settings_manager.settings.window_y = pos.y()
+        safe_pos = normalize_window_position(pos, self.size(), get_screen_geometries())
+        self._settings_manager.settings.window_x = safe_pos.x()
+        self._settings_manager.settings.window_y = safe_pos.y()
         self._settings_manager.save()
         self._auto_hide_behavior.shutdown()
         self._tray.hide()

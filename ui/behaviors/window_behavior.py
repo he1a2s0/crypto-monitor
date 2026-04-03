@@ -6,9 +6,9 @@ import ctypes
 import sys
 from ctypes import wintypes
 
-from PyQt6.QtCore import QPoint, Qt
+from PyQt6.QtCore import QPoint, QRect, QSize, Qt
 from PyQt6.QtGui import QMouseEvent
-from PyQt6.QtWidgets import QWidget
+from PyQt6.QtWidgets import QApplication, QWidget
 
 
 GWL_EXSTYLE = -20
@@ -64,6 +64,46 @@ def hide_window_from_alt_tab(window: QWidget):
         0,
         SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED,
     )
+
+
+def get_screen_geometries() -> list[QRect]:
+    """Return the geometries for all currently available screens."""
+    return [screen.geometry() for screen in QApplication.screens()]
+
+
+def normalize_window_position(
+    top_left: QPoint, window_size: QSize, screen_geometries: list[QRect]
+) -> QPoint:
+    """Clamp a window position so the full window stays on the nearest screen."""
+    if not screen_geometries:
+        return QPoint(top_left)
+
+    width = max(1, window_size.width())
+    height = max(1, window_size.height())
+    best_point: QPoint | None = None
+    best_distance: int | None = None
+
+    for screen in screen_geometries:
+        if not screen.isValid():
+            continue
+
+        max_x = screen.right() - width + 1
+        max_y = screen.bottom() - height + 1
+        x = min(max(top_left.x(), screen.left()), max_x)
+        y = min(max(top_left.y(), screen.top()), max_y)
+
+        if max_x < screen.left():
+            x = screen.left()
+        if max_y < screen.top():
+            y = screen.top()
+
+        candidate = QPoint(x, y)
+        distance = abs(candidate.x() - top_left.x()) + abs(candidate.y() - top_left.y())
+        if best_distance is None or distance < best_distance:
+            best_point = candidate
+            best_distance = distance
+
+    return best_point if best_point is not None else QPoint(top_left)
 
 
 class DraggableWindowBehavior:

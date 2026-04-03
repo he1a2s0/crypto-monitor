@@ -5,11 +5,12 @@ View state management (Minimalist View, Animations, Resizing).
 import logging
 import time
 
-from PyQt6.QtCore import QEasingCurve, QObject, QPropertyAnimation, QTimer
+from PyQt6.QtCore import QEasingCurve, QObject, QPoint, QPropertyAnimation, QTimer
 from PyQt6.QtGui import QCursor
 from PyQt6.QtWidgets import QGraphicsOpacityEffect, QMainWindow, QWidget
 
 from config.settings import SettingsManager
+from ui.behaviors.window_behavior import get_screen_geometries, normalize_window_position
 
 logger = logging.getLogger(__name__)
 
@@ -168,7 +169,12 @@ class ViewManager(QObject):
 
             if self._window.height() != int(target_h) or self._window.y() != int(new_y):
                 self._window.setFixedSize(target_w, int(target_h))
-                self._window.move(current_geom.x(), int(new_y))
+                safe_pos = normalize_window_position(
+                    QPoint(current_geom.x(), int(new_y)),
+                    self._window.size(),
+                    get_screen_geometries(),
+                )
+                self._window.move(safe_pos)
                 self._last_state_change_time = time.time()
 
             self._window.update()
