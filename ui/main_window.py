@@ -24,7 +24,7 @@ from core.market_data_controller import MarketDataController
 
 # New components
 from ui.behaviors.auto_hide_behavior import AutoHideBehavior
-from ui.behaviors.window_behavior import DraggableWindowBehavior
+from ui.behaviors.window_behavior import DraggableWindowBehavior, hide_window_from_alt_tab
 from ui.managers.pagination_manager import PaginationManager
 from ui.managers.view_manager import ViewManager
 from ui.settings_window import SettingsWindow
@@ -88,6 +88,7 @@ class MainWindow(QMainWindow):
         if self._settings_manager.settings.always_on_top:
             flags |= Qt.WindowType.WindowStaysOnTopHint
         self.setWindowFlags(flags)
+        self._schedule_alt_tab_visibility_update()
 
         self._setup_tray()
 
@@ -321,6 +322,11 @@ class MainWindow(QMainWindow):
             flags &= ~Qt.WindowType.WindowStaysOnTopHint
         self.setWindowFlags(flags)
         self.show()
+        self._schedule_alt_tab_visibility_update()
+
+    def _schedule_alt_tab_visibility_update(self):
+        """Reapply native window styles after Qt rebuilds window flags."""
+        QTimer.singleShot(0, lambda: hide_window_from_alt_tab(self))
 
     def _close_app(self):
         """Close button → fully quit the application."""
@@ -396,6 +402,10 @@ class MainWindow(QMainWindow):
         # (e.g. Win+Shift+Arrow across monitors).
         self._auto_hide_behavior.on_window_moved()
         super().moveEvent(event)
+
+    def showEvent(self, event):
+        self._schedule_alt_tab_visibility_update()
+        super().showEvent(event)
 
     def enterEvent(self, event):
         self._view_manager.handle_enter_event()
