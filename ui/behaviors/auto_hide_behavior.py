@@ -55,8 +55,8 @@ class EdgeToggleButton(QWidget):
             self.update()
 
     def _place_on_edge(self, win_center: QPoint):
-        screens = QApplication.screens()
-        screen = (QApplication.primaryScreen() or screens[0]).availableGeometry()
+        screen_obj = QApplication.screenAt(win_center) or QApplication.primaryScreen()
+        screen = screen_obj.geometry()
         T, L = self._THICK, self._LEN
         if self._edge in ("left", "right"):
             w, h = T, L
@@ -72,10 +72,14 @@ class EdgeToggleButton(QWidget):
         """Place button at screen edge while window is hidden."""
         self._place_on_edge(win_center)
 
+    def place_on_edge(self, win_center: QPoint):
+        """Place button on the current screen edge aligned with the window center."""
+        self._place_on_edge(win_center)
+
     def place_for_visible(self, window_geom):
         """Place button beside the visible window without overlapping it."""
-        screens = QApplication.screens()
-        screen = (QApplication.primaryScreen() or screens[0]).availableGeometry()
+        screen_obj = QApplication.screenAt(window_geom.center()) or QApplication.primaryScreen()
+        screen = screen_obj.geometry()
         w, h = self.width(), self.height()
 
         if self._edge == "left":
@@ -215,6 +219,35 @@ class AutoHideBehavior(QObject):
             return QPoint(self._restored_pos)
         return None
 
+    def on_window_moved(self):
+        """Synchronize auto-hide state when the window position changes externally."""
+        if not self._active:
+            return
+
+        edge = self._detect_edge()
+        if edge:
+            self._hidden_edge = edge
+            if not self._is_hidden and not self._animating:
+                self._restored_pos = QPoint(self._window.pos())
+        elif not self._is_hidden and not self._animating:
+            self._stop()
+            return
+
+        if self._btn:
+            if self._is_hidden:
+                self._btn.place_on_edge(self._window.frameGeometry().center())
+            else:
+                self._btn.place_on_edge(self._window.frameGeometry().center())
+
+    def shutdown(self):
+        """Stop auto-hide behavior and remove any edge button."""
+        self._stop()
+        self._poll_timer.stop()
+
+    def suspend(self):
+        """Temporarily clear auto-hide state without disabling polling."""
+        self._stop()
+
     # ------------------------------------------------------------------
     # State machine
     # ------------------------------------------------------------------
@@ -267,12 +300,12 @@ class AutoHideBehavior(QObject):
         elif self._hidden_edge == "top":
             target = QPoint(p.x(), screen.top() - h - 2)
         else:  # bottom
-            target = QPoint(p.x(), screen.bottom() + 2)
+            target = QPoint(p.x(), screen.bottom() + h + 2)
 
         self._is_hidden = True
         self._animate(target)
         if self._btn:
-            self._btn.place_for_hidden(self._window.frameGeometry().center())
+            self._btn.place_on_edge(self._window.frameGeometry().center())
             self._btn.set_state(EdgeToggleButton.STATE_HIDDEN)
         logger.debug(f"AutoHide: hiding toward {self._hidden_edge}")
 
@@ -280,15 +313,14 @@ class AutoHideBehavior(QObject):
         """Slide the window back to *_restored_pos*."""
         if not self._active or not self._is_hidden or self._animating:
             return
-        if self._restored_pos is None:
-            return
         self._is_hidden = False
-        self._animate(self._restored_pos)
+        target = self._visible_target_pos()
+        self._animate(target)
         if self._btn:
             # showing via hover → orange; showing via click (pinned) → will be updated in _on_toggle_clicked
             state = EdgeToggleButton.STATE_PINNED if self._pinned else EdgeToggleButton.STATE_HOVER
             self._btn.set_state(state)
-            self._btn.place_for_visible(self._window.frameGeometry())
+            self._btn.place_on_edge(self._target_window_center(target))
         logger.debug("AutoHide: showing window")
 
     def _animate(self, target: QPoint):
@@ -304,10 +336,11 @@ class AutoHideBehavior(QObject):
             # Just finished hiding → ensure toggle button is visible
             if self._btn is None:
                 self._make_button()
+            elif self._btn:
+                self._btn.place_on_edge(self._window.frameGeometry().center())
         else:
-            # Just finished showing → only kill button when pinned via click
-            if self._pinned:
-                self._kill_button()
+            if self._btn:
+                self._btn.place_on_edge(self._window.frameGeometry().center())
 
     # ------------------------------------------------------------------
     # Toggle button
@@ -316,10 +349,7 @@ class AutoHideBehavior(QObject):
     def _make_button(self):
         self._kill_button()
         wg = self._window.frameGeometry()
-        if self._hidden_edge in ("left", "right"):
-            center = QPoint(0, wg.center().y())
-        else:
-            center = QPoint(wg.center().x(), 0)
+        center = wg.center()
         self._btn = EdgeToggleButton(self._hidden_edge, center)
         self._btn.clicked.connect(self._on_toggle_clicked)
         self._btn.show()
@@ -401,4 +431,35 @@ class AutoHideBehavior(QObject):
     def _screen_rect(self):
         center = self._window.frameGeometry().center()
         screen = QApplication.screenAt(center) or QApplication.primaryScreen()
-        return screen.availableGeometry()
+        return screen.geometry()
+
+    def _visible_target_pos(self) -> QPoint:
+        screen = self._screen_rect()
+        base = self._restored_pos or self._window.pos()
+        window_width = self._window.width()
+        window_height = self._window.height()
+        button_thickness = EdgeToggleButton._THICK
+
+        max_x = screen.right() - window_width + 1
+        max_y = screen.bottom() - window_height + 1
+
+        if self._hidden_edge == "left":
+            x = screen.left() + button_thickness
+            y = max(screen.top(), min(base.y(), max_y))
+        elif self._hidden_edge == "right":
+            x = screen.right() - button_thickness - window_width + 1
+            y = max(screen.top(), min(base.y(), max_y))
+        elif self._hidden_edge == "top":
+            x = max(screen.left(), min(base.x(), max_x))
+            y = screen.top() + button_thickness
+        else:
+            x = max(screen.left(), min(base.x(), max_x))
+            y = screen.bottom() - button_thickness - window_height + 1
+
+        return QPoint(x, y)
+
+    def _target_window_center(self, top_left: QPoint) -> QPoint:
+        return QPoint(
+            top_left.x() + self._window.width() // 2,
+            top_left.y() + self._window.height() // 2,
+        )

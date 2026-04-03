@@ -83,7 +83,7 @@ class MainWindow(QMainWindow):
         """Setup the main window UI with Fluent Design components."""
         flags = (
             Qt.WindowType.FramelessWindowHint
-            | Qt.WindowType.Tool  # hides taskbar button and Alt+Tab entry
+            | Qt.WindowType.Window
         )
         if self._settings_manager.settings.always_on_top:
             flags |= Qt.WindowType.WindowStaysOnTopHint
@@ -323,9 +323,8 @@ class MainWindow(QMainWindow):
         self.show()
 
     def _close_app(self):
-        """Close button → minimize to tray."""
-        self.hide()
-        self._tray_toggle_action.setText(_("Show"))
+        """Close button → fully quit the application."""
+        self._quit_app()
 
     def _setup_tray(self):
         """Create the system tray icon with a context menu."""
@@ -350,6 +349,7 @@ class MainWindow(QMainWindow):
     def _tray_toggle(self):
         """Toggle main window between visible and hidden."""
         if self.isVisible():
+            self._auto_hide_behavior.suspend()
             self.hide()
             self._tray_toggle_action.setText(_("Show"))
         else:
@@ -365,6 +365,8 @@ class MainWindow(QMainWindow):
         self._settings_manager.settings.window_x = pos.x()
         self._settings_manager.settings.window_y = pos.y()
         self._settings_manager.save()
+        self._auto_hide_behavior.shutdown()
+        self._tray.hide()
         if self._market_controller:
             self._market_controller.stop()
         QApplication.quit()
@@ -388,6 +390,12 @@ class MainWindow(QMainWindow):
         if did_drag:
             self._auto_hide_behavior.on_drag_released()
         super().mouseReleaseEvent(event)
+
+    def moveEvent(self, event):
+        # Keep auto-hide state and edge button aligned when the OS moves window
+        # (e.g. Win+Shift+Arrow across monitors).
+        self._auto_hide_behavior.on_window_moved()
+        super().moveEvent(event)
 
     def enterEvent(self, event):
         self._view_manager.handle_enter_event()
