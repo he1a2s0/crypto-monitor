@@ -43,6 +43,7 @@ from ui.widgets.toolbar import Toolbar
 
 logger = logging.getLogger(__name__)
 APP_ICON_PATH = get_resource_path("assets", "icons", "crypto-monitor.png")
+AUTO_HIDE_EDGES = {"left", "right", "top", "bottom"}
 
 
 class MainWindow(QMainWindow):
@@ -54,6 +55,7 @@ class MainWindow(QMainWindow):
         self._settings_window: SettingsWindow | None = None
         self._cards: dict[str, CryptoCard] = {}
         self._edit_mode = False
+        self._pending_hidden_auto_hide_edge: str | None = None
 
         # Core components
         self._settings_manager = get_settings_manager()
@@ -83,6 +85,7 @@ class MainWindow(QMainWindow):
         self._pagination_manager.setup_auto_scroll()
         self._market_controller.start()
 
+        self._pending_hidden_auto_hide_edge = self._get_pending_hidden_auto_hide_edge()
         self._restore_window_position()
 
         # Initial size adjustment
@@ -348,6 +351,20 @@ class MainWindow(QMainWindow):
         """Re-apply deferred geometry changes and keep the window on-screen."""
         self._view_manager.adjust_window_height()
         self._restore_window_position()
+        self._restore_hidden_auto_hide_state()
+
+    def _get_pending_hidden_auto_hide_edge(self) -> str | None:
+        settings = self._settings_manager.settings
+        if not settings.auto_hide_hidden or settings.auto_hide_edge not in AUTO_HIDE_EDGES:
+            return None
+        return settings.auto_hide_edge
+
+    def _restore_hidden_auto_hide_state(self):
+        if self._pending_hidden_auto_hide_edge is None:
+            return
+
+        self._auto_hide_behavior.restore_hidden_state(self._pending_hidden_auto_hide_edge)
+        self._pending_hidden_auto_hide_edge = None
 
     def _close_app(self):
         """Close button → fully quit the application."""
@@ -388,10 +405,15 @@ class MainWindow(QMainWindow):
     def _quit_app(self):
         """Fully quit the application."""
         visible_pos = self._auto_hide_behavior.get_visible_pos()
+        should_restore_hidden, hidden_edge = self._auto_hide_behavior.get_persisted_state()
         pos = visible_pos if visible_pos is not None else self.pos()
         safe_pos = normalize_window_position(pos, self.size(), get_screen_geometries())
         self._settings_manager.settings.window_x = safe_pos.x()
         self._settings_manager.settings.window_y = safe_pos.y()
+        self._settings_manager.settings.auto_hide_hidden = should_restore_hidden
+        self._settings_manager.settings.auto_hide_edge = (
+            hidden_edge if should_restore_hidden else None
+        )
         self._settings_manager.save()
         self._auto_hide_behavior.shutdown()
         self._tray.hide()

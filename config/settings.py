@@ -135,6 +135,8 @@ class AppSettings:
     proxy: ProxyConfig = field(default_factory=ProxyConfig)
     window_x: int = 100
     window_y: int = 100
+    auto_hide_hidden: bool = False
+    auto_hide_edge: str | None = None
     always_on_top: bool = True
     language: str = "auto"  # "auto", "en_US", "zh_CN", etc.
     price_change_basis: str = "24h_rolling"  # "24h_rolling" or "utc_0"
@@ -246,6 +248,8 @@ class SettingsManager:
                     "scroll_interval",
                     "window_x",
                     "window_y",
+                    "auto_hide_hidden",
+                    "auto_hide_edge",
                     "always_on_top",
                     "language",
                     "price_change_basis",
@@ -564,6 +568,8 @@ class SettingsManager:
             "scroll_interval",
             "window_x",
             "window_y",
+            "auto_hide_hidden",
+            "auto_hide_edge",
             "always_on_top",
             "language",
             "price_change_basis",

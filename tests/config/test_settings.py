@@ -43,6 +43,8 @@ class TestSettingsManager:
         settings_manager.settings.data_source = "Binance"
         settings_manager.settings.theme_mode = "dark"
         settings_manager.settings.crypto_pairs = ["BTC-USDT"]
+        settings_manager.settings.auto_hide_hidden = True
+        settings_manager.settings.auto_hide_edge = "left"
 
         settings_manager.save()
 
@@ -54,6 +56,8 @@ class TestSettingsManager:
         assert loaded_settings.data_source == "Binance"
         assert loaded_settings.theme_mode == "dark"
         assert loaded_settings.crypto_pairs == ["BTC-USDT"]
+        assert loaded_settings.auto_hide_hidden is True
+        assert loaded_settings.auto_hide_edge == "left"
 
     def test_add_remove_pairs(self, settings_manager):
         settings_manager.settings.crypto_pairs = []
@@ -100,3 +104,5 @@ class TestSettingsManager:
         assert settings.data_source == "Binance"
         assert settings.websocket.auto_reconnect is True
         assert settings.alerts == []
+        assert settings.auto_hide_hidden is False
+        assert settings.auto_hide_edge is None
