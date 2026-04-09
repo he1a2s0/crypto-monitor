@@ -70,8 +70,15 @@ class BaseWebSocketWorker(QThread):
         is_connected = state in [ConnectionState.CONNECTED, ConnectionState.CONNECTING]
         self.connection_status.emit(is_connected, message)
 
+    def _get_last_activity_time(self) -> float:
+        """Return the most recent connection activity timestamp."""
+        if self._last_message_time > 0:
+            return self._last_message_time
+        return self._connection_start_time
+
     def _update_stats(self):
         """Update connection statistics."""
+        last_activity_time = self._get_last_activity_time()
         stats = {
             "state": self._connection_state.value,
             "reconnect_count": self._total_reconnect_count,
@@ -80,8 +87,8 @@ class BaseWebSocketWorker(QThread):
             "connection_duration": time.time() - self._connection_start_time
             if self._connection_start_time > 0
             else 0,
-            "last_message_age": time.time() - self._last_message_time
-            if self._last_message_time > 0
+            "last_message_age": time.time() - last_activity_time
+            if last_activity_time > 0
             else 0,
             "last_error": self._last_error,
         }
@@ -166,8 +173,9 @@ class BaseWebSocketWorker(QThread):
                         last_ping_time = time.time()
 
                     # 3. Check heartbeat (Zombie detection)
-                    if self._last_message_time > 0:
-                        time_since_last = time.time() - self._last_message_time
+                    last_activity_time = self._get_last_activity_time()
+                    if last_activity_time > 0:
+                        time_since_last = time.time() - last_activity_time
                         if time_since_last > self._connection_timeout:
                             self._last_error = f"Heartbeat timeout: {time_since_last:.1f}s"
                             self._update_connection_state(
