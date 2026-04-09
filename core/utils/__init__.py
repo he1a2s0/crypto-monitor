@@ -3,7 +3,9 @@ Utility functions for Crypto Monitor.
 """
 
 import os
+import sys
 from contextlib import contextmanager
+from pathlib import Path
 
 
 @contextmanager
@@ -23,6 +25,16 @@ def suppress_output():
 
         for fd in null_fds + save_fds:
             os.close(fd)
+
+
+def get_resource_path(*parts: str) -> str:
+    """Resolve a bundled or source resource path."""
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        base_path = Path(sys._MEIPASS)
+    else:
+        base_path = Path(__file__).resolve().parents[2]
+
+    return str(base_path.joinpath(*parts))
 
 
 def format_price(price: float | str, precision: int | None = None) -> str:

@@ -7,12 +7,6 @@ $I_flag = $args -ccontains '-I' # Generate installer only (skip build)
 # Logic: Build unless -I is present.
 if (-not $I_flag) {
     Write-Host "Building Application..." -ForegroundColor Cyan
-    $iconPath = Resolve-Path "assets\icons\crypto-monitor.ico" -ErrorAction SilentlyContinue
-    if ($iconPath) {
-        $iconParam = "--icon=$($iconPath.Path)"
-    } else {
-        $iconParam = ""
-    }
     Remove-Item -Recurse -Force build, dist -ErrorAction SilentlyContinue
     uv run pyinstaller crypto-monitor.spec
     

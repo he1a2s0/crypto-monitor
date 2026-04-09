@@ -17,6 +17,7 @@ from PyQt6.QtMultimedia import QAudioOutput, QMediaPlayer
 
 from config.settings import get_settings_manager
 from core.i18n import _
+from core.utils import get_resource_path
 from core.utils import suppress_output
 
 logger = logging.getLogger(__name__)
@@ -153,15 +154,7 @@ class NotificationService(QObject):
                 if settings.sound_mode == "system":
                     sound_file = DEFAULT_SOUND
                 elif settings.sound_mode == "chime":
-                    # Resolve path for chime sound
-                    if getattr(sys, "frozen", False):
-                        # Running in PyInstaller bundle
-                        base_path = sys._MEIPASS
-                    else:
-                        # Running in dev mode
-                        base_path = os.getcwd()
-
-                    chime_path = os.path.join(base_path, "assets", "sounds", "chime-alert.mp3")
+                    chime_path = get_resource_path("assets", "sounds", "chime-alert.mp3")
                     # Play sound directly using Qt
                     self._play_sound(chime_path)
                     # Don't use system notification sound

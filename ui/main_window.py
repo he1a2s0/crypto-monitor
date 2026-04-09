@@ -21,6 +21,7 @@ from qfluentwidgets import Theme, setTheme
 from config.settings import get_settings_manager
 from core.i18n import _
 from core.market_data_controller import MarketDataController
+from core.utils import get_resource_path
 
 # New components
 from ui.behaviors.auto_hide_behavior import AutoHideBehavior
@@ -41,6 +42,7 @@ from ui.widgets.pagination import Pagination
 from ui.widgets.toolbar import Toolbar
 
 logger = logging.getLogger(__name__)
+APP_ICON_PATH = get_resource_path("assets", "icons", "crypto-monitor.png")
 
 
 class MainWindow(QMainWindow):
@@ -100,7 +102,7 @@ class MainWindow(QMainWindow):
         self._setup_tray()
 
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.setWindowIcon(QIcon("assets/icons/crypto-monitor.png"))
+        self.setWindowIcon(QIcon(APP_ICON_PATH))
         self.setWindowTitle(_("Crypto Monitor"))
 
         central = QWidget()
@@ -353,7 +355,7 @@ class MainWindow(QMainWindow):
 
     def _setup_tray(self):
         """Create the system tray icon with a context menu."""
-        self._tray = QSystemTrayIcon(QIcon("assets/icons/crypto-monitor.png"), self)
+        self._tray = QSystemTrayIcon(QIcon(APP_ICON_PATH), self)
         self._tray.setToolTip(_("Crypto Monitor"))
 
         menu = QMenu()

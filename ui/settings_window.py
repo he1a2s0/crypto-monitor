@@ -29,6 +29,7 @@ from qfluentwidgets import (
 
 from config.settings import ProxyConfig, SettingsManager
 from core.i18n import _
+from core.utils import get_resource_path
 from ui.settings.pages.about_page import AboutPage
 from ui.settings.pages.appearance_page import AppearancePage
 from ui.settings.pages.notifications_page import NotificationsPage
@@ -36,6 +37,7 @@ from ui.settings.pages.pairs_page import PairsPage
 from ui.settings.pages.proxy_page import ProxyPage
 
 logger = logging.getLogger(__name__)
+APP_ICON_PATH = get_resource_path("assets", "icons", "crypto-monitor.png")
 
 
 class SettingsWindow(QMainWindow):
@@ -75,7 +77,7 @@ class SettingsWindow(QMainWindow):
             flags |= Qt.WindowType.WindowStaysOnTopHint
         self.setWindowFlags(flags)
 
-        self.setWindowIcon(QIcon("assets/icons/crypto-monitor.png"))
+        self.setWindowIcon(QIcon(APP_ICON_PATH))
 
         # Background
         bg_color = "rgb(32, 32, 32)" if self._theme_mode == "dark" else "rgb(249, 249, 249)"
